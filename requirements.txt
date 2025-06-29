@@ -1,0 +1,13 @@
+flask
+pandas
+numpy
+scikit-learn
+nltk
+gensim
+tensorflow
+joblib
+beautifulsoup4
+transformers
+wikipedia
+lxml
+openpyxl

@@ -1,17 +1,11 @@
-# train.py
 import re, os
 import numpy as np
 import pandas as pd
 import joblib
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 from gensim.scripts.glove2word2vec import glove2word2vec
 from gensim.models import KeyedVectors
 from tensorflow.keras import Model, Input
@@ -19,10 +13,7 @@ from tensorflow.keras.layers import Embedding, LSTM, Bidirectional, Dropout, Den
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from sklearn.utils import resample
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 from common import *
 from config import *
 
@@ -73,14 +64,14 @@ print(f"✅ Best model selected: {best_model.__class__.__name__} with macro F1-s
 
 # Évaluation sur le test set
 y_test_pred = best_model.predict(X_test_tf)
-print("\n📊 Test set classification report:")
+print("\n📊 Test set classification report (Best ML Model):")
 print(classification_report(y_test, y_test_pred, digits=3))
 
 # Save artifacts
 joblib.dump(vec, VECTORIZER_FILE)
 joblib.dump(best_model, ML_MODEL_FILE)
 
-# 4) Prepare embeddings for DL
+# Preparer embeddings pour DL
 if not os.path.exists(W2V_FILE):
     glove2word2vec(GLOVE_FILE, W2V_FILE)
 wv = KeyedVectors.load_word2vec_format(W2V_FILE)
@@ -93,22 +84,19 @@ X_dl = pad_sequences(seqs, maxlen=MAX_LEN)
 y_dl = pd.get_dummies(y).values
 
 # DL splits
-X_temp_dl, X_test_dl, y_temp_dl, y_test_dl = train_test_split(
-    X_dl, y_dl, test_size=0.1, random_state=RANDOM_STATE, stratify=y_dl)
-X_train_dl, X_val_dl, y_train_dl, y_val_dl = train_test_split(
-    X_temp_dl, y_temp_dl, test_size=0.2222, random_state=RANDOM_STATE, stratify=y_temp_dl)
+X_temp_dl, X_test_dl, y_temp_dl, y_test_dl = train_test_split(X_dl, y_dl, test_size=0.1, random_state=RANDOM_STATE, stratify=y_dl)
+X_train_dl, X_val_dl, y_train_dl, y_val_dl = train_test_split(X_temp_dl, y_temp_dl, test_size=0.2222, random_state=RANDOM_STATE, stratify=y_temp_dl)
 
-# Embedding matrix
+# Matrice embedding
 vocab_size = min(MAX_FEATURES, len(tok.word_index) + 1)
 emb_matrix = np.zeros((vocab_size, EMBED_DIM))
 for w, i in tok.word_index.items():
     if i < MAX_FEATURES and w in wv:
         emb_matrix[i] = wv[w]
 
-# 5) Build bidirectional LSTM
+# Model bidirectional LSTM
 inp = Input(shape=(MAX_LEN,), name='inputs')
-embed = Embedding(vocab_size, EMBED_DIM, weights=[emb_matrix], 
-                  trainable=True, name='embed')(inp)
+embed = Embedding(vocab_size, EMBED_DIM, weights=[emb_matrix], trainable=True, name='embed')(inp)
 x = Bidirectional(LSTM(128, return_sequences=True), name='bilstm1')(embed)
 x = Dropout(0.3)(x)
 x = Bidirectional(LSTM(64), name='bilstm2')(x)
@@ -117,21 +105,29 @@ out = Dense(y_dl.shape[1], activation='softmax', name='predictions')(x)
 model = Model(inputs=inp, outputs=out, name='bidir_lstm')
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-# 6) Callbacks & training
+# Callbacks & training
 es = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
 ck = ModelCheckpoint(DL_MODEL_FILE, monitor='val_loss', save_best_only=True)
-model.fit(
-    X_train_dl, y_train_dl,
-    epochs=20, batch_size=64,
-    validation_data=(X_val_dl, y_val_dl),
-    callbacks=[es, ck],
-    verbose=1
-)
+model.fit(X_train_dl, y_train_dl, epochs=20, batch_size=64, validation_data=(X_val_dl, y_val_dl), callbacks=[es, ck], verbose=1)
 
 # Evaluate DL
-dl_acc = model.evaluate(X_test_dl, y_test_dl, verbose=0)[1]
-print(f"DL test accuracy: {dl_acc:.4f}")
+dl_preds = model.predict(X_test_dl, verbose=0)
+dl_preds_labels = np.argmax(dl_preds, axis=1)
+dl_true_labels = np.argmax(y_test_dl, axis=1)
+classes = y.unique()
+print("\n📊 Test set classification report (Deep Learning Model):")
+print(classification_report(dl_true_labels, dl_preds_labels, target_names=classes, digits=3))
+dl_acc = accuracy_score(dl_true_labels, dl_preds_labels)
+dl_prec = precision_score(dl_true_labels, dl_preds_labels, average='macro')
+dl_rec = recall_score(dl_true_labels, dl_preds_labels, average='macro')
+dl_f1 = f1_score(dl_true_labels, dl_preds_labels, average='macro')
+print(f"DL test metrics:")
+print(f" - Accuracy : {dl_acc:.4f}")
+print(f" - Precision: {dl_prec:.4f}")
+print(f" - Recall   : {dl_rec:.4f}")
+print(f" - F1-score : {dl_f1:.4f}")
 
-# Save tokenizer
+# Save tokenizer and classes
 joblib.dump(tok, TOKENIZER_FILE)
+joblib.dump(y.unique(), CLASSES_FILE)
 print("All artifacts saved.")

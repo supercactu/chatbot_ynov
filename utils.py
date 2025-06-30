@@ -19,19 +19,33 @@ classes_file = joblib.load(CLASSES_FILE)
 
 wikipedia.BeautifulSoup = lambda markup: BeautifulSoup(markup, features="lxml")
 
-# ML classification
 def classify_ml(text):
     clean = preprocess(text)
-    X     = vectorizer.transform([clean])
-    return ml_model.predict(X)[0]
+    X = vectorizer.transform([clean])
+    probs = ml_model.predict_proba(X)[0]
+    idx = np.argmax(probs)
+    score_pct = round(probs[idx] * 100, 2)
+    return ml_model.classes_[idx], score_pct
 
-# DL classification
 def classify_dl(text):
     clean = preprocess(text)
     seq = tokenizer.texts_to_sequences([clean])
-    pad = pad_sequences(seq, maxlen=MAX_LEN)
-    preds = dl_model.predict(pad)
-    return classes_file[np.argmax(preds)]
+    pad_seq = pad_sequences(seq, maxlen=MAX_LEN)
+    preds = dl_model.predict(pad_seq, verbose=0)[0]
+    idx = np.argmax(preds)
+    score_pct = round(preds[idx] * 100, 2)
+    return classes_file[idx], score_pct
+
+def classify_combined(text):
+    ml_class, ml_score = classify_ml(text)
+    dl_class, dl_score = classify_dl(text)
+
+    if ml_class == dl_class:
+        # Accord entre les deux modèles
+        return ml_class
+    else:
+        # Choisir la classe ayant le score le plus élevé
+        return ml_class if ml_score > dl_score else dl_class
 
 # Extraire mots clés
 def extract_keywords(text, top_n=10, weight_threshold=0.1):
@@ -51,8 +65,26 @@ def extract_keywords(text, top_n=10, weight_threshold=0.1):
         word for word, coef in word_coefs 
         if word in text_words and abs(coef) >= weight_threshold
     ][:top_n]
-
     return keywords
+
+def extract_keywords_dl(text, top_n=10):
+    clean = preprocess(text)
+    tokens = word_tokenize(clean)
+    tfidf_vec = vectorizer.transform([clean])
+    feature_names = vectorizer.get_feature_names_out()
+    scores = tfidf_vec.toarray()[0]
+
+    word_scores = [(feature_names[i], scores[i]) for i in range(len(scores)) if feature_names[i] in tokens]
+    word_scores = sorted(word_scores, key=lambda x: x[1], reverse=True)
+    return [word for word, score in word_scores[:top_n]]
+
+def extract_keywords_combined(text, top_n=10):
+    kws_ml = extract_keywords(text, top_n=top_n)
+    kws_dl = extract_keywords_dl(text, top_n=top_n)
+
+    # Fusion : union pondérée ou intersection, ou priorité selon pertinence
+    combined = list(dict.fromkeys(kws_ml + kws_dl))  # Union sans doublon, préserve l’ordre
+    return combined[:top_n]
 
 # Summarization
 def get_summarizer():

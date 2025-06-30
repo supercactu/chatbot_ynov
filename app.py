@@ -4,7 +4,7 @@ warnings.filterwarnings('ignore')
 
 from flask import Flask, request, render_template
 import nltk
-from utils import classify_ml, classify_dl, extract_keywords, summarize_text, qa, wiki_search
+from utils import *
 
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -29,10 +29,19 @@ def process():
             return "Mots‑clés ML : " + ", ".join(kws)
         else:
             return "Aucun mot‑clé trouvé pour ce texte."
+        
+    elif task == 'keywords_combined':
+        kws = extract_keywords_combined(txt, top_n=10)
+        return "Mots‑clés combinés ML + DL : " + ", ".join(kws)
+
     
     elif task == 'summarize':
         return summarize_text(txt)
     
+    elif task == 'classify_combined':
+        result = classify_combined(txt)
+        return f"✅ Classification combinée : {result}"
+
     elif task == 'qa':
         return qa(txt)
     

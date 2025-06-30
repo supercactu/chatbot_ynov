@@ -21,8 +21,6 @@ Si tu as besoin de ces données, il faudra les obtenir séparément ou les gén�
 
 ## Structure du projet
 
-## Structure du projet
-
 - `config.py` : Configuration des chemins, constantes et paramètres.
 - `common.py` : Fonctions de prétraitement du texte (nettoyage, tokenization, lemmatisation).
 - `utils.py` : Fonctions principales pour la classification, extraction de mots-clés, résumé, QA, recherche Wikipedia.

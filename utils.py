@@ -15,6 +15,7 @@ vectorizer = joblib.load(VECTORIZER_FILE)
 ml_model   = joblib.load(ML_MODEL_FILE)
 tokenizer  = joblib.load(TOKENIZER_FILE)
 dl_model   = load_model(DL_MODEL_FILE)
+classes_file = joblib.load(CLASSES_FILE)
 
 wikipedia.BeautifulSoup = lambda markup: BeautifulSoup(markup, features="lxml")
 
@@ -27,11 +28,12 @@ def classify_ml(text):
 # DL classification
 def classify_dl(text):
     clean = preprocess(text)
-    seq   = tokenizer.texts_to_sequences([clean])
-    pad   = pad_sequences(seq, maxlen=MAX_LEN)
+    seq = tokenizer.texts_to_sequences([clean])
+    pad = pad_sequences(seq, maxlen=MAX_LEN)
     preds = dl_model.predict(pad)
-    return ml_model.classes_[np.argmax(preds)]
+    return classes_file[np.argmax(preds)]
 
+# Extraire mots clés
 def extract_keywords(text, top_n=10, weight_threshold=0.1):
     clean = preprocess(text)
     X = vectorizer.transform([clean])

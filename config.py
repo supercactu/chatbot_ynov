@@ -17,6 +17,7 @@ VECTORIZER_FILE = os.path.join(MODEL_DIR, 'vectorizer.pkl')
 ML_MODEL_FILE = os.path.join(MODEL_DIR, 'ml_model.pkl')
 DL_MODEL_FILE = os.path.join(MODEL_DIR, 'dl_model.keras')
 TOKENIZER_FILE = os.path.join(MODEL_DIR, 'tokenizer.pkl')
+CLASSES_FILE = os.path.join(MODEL_DIR, 'classes.pkl')
 
 # Paramètres
 MAX_FEATURES =20000

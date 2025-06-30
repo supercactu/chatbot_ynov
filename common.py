@@ -1,13 +1,11 @@
 # common.py
-import os
 import re
-import numpy as np
 import pandas as pd
-import joblib
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
+from sklearn.utils import resample
 from config import *
 
 # Initialisation NLTK (à exécuter une seule fois)
@@ -34,7 +32,7 @@ def preprocess(text, remove_stopwords=True, lemmatize=True, return_tokens=False)
     
     return tokens if return_tokens else " ".join(tokens)
 
-# Chargement et préparation des données ---
+# Chargement et préparation des données
 def load_data(sample_size=None):
     df = pd.read_excel(DATA_FILE, usecols=['category', 'headline', 'short_description'])
     df.dropna(inplace=True)
@@ -44,17 +42,14 @@ def load_data(sample_size=None):
         df = df.sample(n=sample_size, random_state=RANDOM_STATE)
     return df['clean'], df['category']
 
-
+# Equilibrer les classes
 def balance_data(X, y, max_samples=MAX_SAMPLES_PER_CLASS):
     df = pd.DataFrame({'text': X, 'label': y})
     balanced = []
     for label in df['label'].unique():
         subset = df[df['label'] == label]
         if len(subset) > max_samples:
-            subset = resample(subset,
-                              replace=False,
-                              n_samples=max_samples,
-                              random_state=RANDOM_STATE)
+            subset = resample(subset, replace=False, n_samples=max_samples, random_state=RANDOM_STATE)
         balanced.append(subset)
     df_bal = pd.concat(balanced).sample(frac=1, random_state=RANDOM_STATE).reset_index(drop=True)
     return df_bal['text'], df_bal['label']
